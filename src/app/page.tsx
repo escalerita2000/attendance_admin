@@ -18,7 +18,9 @@ import {
   Smartphone,
   Calendar,
   Layers,
-  Settings
+  Settings,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -102,6 +104,18 @@ export default function AdminDashboard() {
   const [puntoLat, setPuntoLat] = useState('');
   const [puntoLng, setPuntoLng] = useState('');
   const [puntoRadio, setPuntoRadio] = useState('15');
+
+  // Estados de Edición
+  const [editingEmp, setEditingEmp] = useState<Empleado | null>(null);
+  const [editEmpNombre, setEditEmpNombre] = useState('');
+  const [editEmpEntrada, setEditEmpEntrada] = useState('09:00');
+  const [editEmpSalida, setEditEmpSalida] = useState('18:00');
+
+  const [editingPunto, setEditingPunto] = useState<PuntoAsistencia | null>(null);
+  const [editPuntoNombre, setEditPuntoNombre] = useState('');
+  const [editPuntoLat, setEditPuntoLat] = useState('');
+  const [editPuntoLng, setEditPuntoLng] = useState('');
+  const [editPuntoRadio, setEditPuntoRadio] = useState('15');
 
   // Escuchar estado de autenticación
   useEffect(() => {
@@ -245,6 +259,79 @@ export default function AdminDashboard() {
       fetchData();
     } catch (err: any) {
       alert('Error al crear punto de asistencia: ' + err.message);
+    }
+  };
+
+  // Modificar Empleado
+  const handleUpdateEmpleado = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEmp || !editEmpNombre) return;
+
+    try {
+      const { error } = await supabase
+        .from('empleados')
+        .update({
+          nombre: editEmpNombre,
+          hora_entrada: editEmpEntrada,
+          hora_salida: editEmpSalida,
+        })
+        .eq('id', editingEmp.id);
+
+      if (error) throw error;
+      
+      setEditingEmp(null);
+      fetchData();
+    } catch (err: any) {
+      alert('Error al actualizar empleado: ' + err.message);
+    }
+  };
+
+  // Eliminar Empleado
+  const handleDeleteEmpleado = async (id: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este empleado? Se borrarán todos sus registros y vinculaciones.')) return;
+    try {
+      const { error } = await supabase.from('empleados').delete().eq('id', id);
+      if (error) throw error;
+      fetchData();
+    } catch (err: any) {
+      alert('Error al eliminar empleado: ' + err.message);
+    }
+  };
+
+  // Modificar Punto
+  const handleUpdatePunto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPunto || !editPuntoNombre || !editPuntoLat || !editPuntoLng) return;
+
+    try {
+      const { error } = await supabase
+        .from('puntos_asistencia')
+        .update({
+          nombre: editPuntoNombre,
+          latitud: parseFloat(editPuntoLat),
+          longitud: parseFloat(editPuntoLng),
+          radio_metros: parseFloat(editPuntoRadio),
+        })
+        .eq('id', editingPunto.id);
+
+      if (error) throw error;
+
+      setEditingPunto(null);
+      fetchData();
+    } catch (err: any) {
+      alert('Error al actualizar punto: ' + err.message);
+    }
+  };
+
+  // Eliminar Punto
+  const handleDeletePunto = async (id: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este punto de asistencia?')) return;
+    try {
+      const { error } = await supabase.from('puntos_asistencia').delete().eq('id', id);
+      if (error) throw error;
+      fetchData();
+    } catch (err: any) {
+      alert('Error al eliminar punto de asistencia: ' + err.message);
     }
   };
 
@@ -631,7 +718,7 @@ export default function AdminDashboard() {
                               <span className="text-xs text-slate-500">Sin vincular</span>
                             )}
                           </td>
-                          <td className="p-4 pr-6 text-right">
+                          <td className="p-4 pr-6 text-right space-x-2">
                             <button 
                               onClick={() => setSelectedQR({
                                 title: `Vinculación: ${emp.nombre}`,
@@ -640,6 +727,23 @@ export default function AdminDashboard() {
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 text-xs font-bold transition-all"
                             >
                               <QrCode className="w-4 h-4" /> QR Enlace
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setEditingEmp(emp);
+                                setEditEmpNombre(emp.nombre);
+                                setEditEmpEntrada(emp.hora_entrada.substring(0, 5));
+                                setEditEmpSalida(emp.hora_salida.substring(0, 5));
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-bold transition-all"
+                            >
+                              <Edit className="w-4 h-4" /> Editar
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteEmpleado(emp.id)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 text-xs font-bold transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" /> Eliminar
                             </button>
                           </td>
                         </tr>
@@ -666,6 +770,25 @@ export default function AdminDashboard() {
                   </button>
                 </div>
 
+                {/* QR UNICO GLOBAL CARD */}
+                <div className="bg-[#0f172a] p-6 rounded-2xl border border-[#1e293b] flex flex-col md:flex-row justify-between items-center gap-6">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-bold text-indigo-400">Código QR Único de Asistencia</h3>
+                    <p className="text-slate-400 text-sm max-w-2xl text-left">
+                      Este es un código QR único global para toda la organización. Puedes imprimir este único código y colocarlo en cualquiera de tus oficinas. La aplicación móvil detectará automáticamente en cuál oficina se encuentra el empleado mediante GPS.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedQR({
+                      title: "Código QR Único de Asistencia",
+                      data: JSON.stringify({ type: "attendance_global", system: "flux-register" })
+                    })}
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors font-bold text-sm shadow-lg shadow-indigo-600/15 whitespace-nowrap"
+                  >
+                    <QrCode className="w-5 h-5" /> Mostrar QR Único
+                  </button>
+                </div>
+
                 <div className="bg-[#0f172a] rounded-2xl border border-[#1e293b] overflow-hidden">
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -674,7 +797,7 @@ export default function AdminDashboard() {
                         <th className="p-4">Latitud</th>
                         <th className="p-4">Longitud</th>
                         <th className="p-4">Radio Permitido</th>
-                        <th className="p-4 pr-6 text-right">Imprimir QR</th>
+                        <th className="p-4 pr-6 text-right">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#1e293b] text-sm">
@@ -691,7 +814,7 @@ export default function AdminDashboard() {
                             <td className="p-4 font-mono text-slate-300">{pt.latitud}</td>
                             <td className="p-4 font-mono text-slate-300">{pt.longitud}</td>
                             <td className="p-4 text-slate-300">{pt.radio_metros} metros</td>
-                            <td className="p-4 pr-6 text-right">
+                            <td className="p-4 pr-6 text-right space-x-2">
                               <button 
                                 onClick={() => setSelectedQR({
                                   title: `QR Asistencia: ${pt.nombre}`,
@@ -699,7 +822,25 @@ export default function AdminDashboard() {
                                 })}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-xs font-bold transition-all"
                               >
-                                <QrCode className="w-4 h-4" /> Mostrar QR de Marcado
+                                <QrCode className="w-4 h-4" /> Mostrar QR
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  setEditingPunto(pt);
+                                  setEditPuntoNombre(pt.nombre);
+                                  setEditPuntoLat(pt.latitud.toString());
+                                  setEditPuntoLng(pt.longitud.toString());
+                                  setEditPuntoRadio(pt.radio_metros.toString());
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-bold transition-all"
+                              >
+                                <Edit className="w-4 h-4" /> Editar
+                              </button>
+                              <button 
+                                onClick={() => handleDeletePunto(pt.id)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 text-xs font-bold transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" /> Eliminar
                               </button>
                             </td>
                           </tr>
@@ -988,6 +1129,139 @@ export default function AdminDashboard() {
                 Cerrar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDITAR EMPLEADO */}
+      {editingEmp && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-md bg-[#0f172a] rounded-3xl border border-[#1e293b] p-8 shadow-2xl">
+            <h3 className="text-xl font-bold mb-6">Editar Empleado</h3>
+            <form onSubmit={handleUpdateEmpleado} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-2">Nombre Completo</label>
+                <input 
+                  type="text" 
+                  required
+                  value={editEmpNombre}
+                  onChange={e => setEditEmpNombre(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#1e293b] border border-[#334155] focus:outline-none focus:border-indigo-500 text-sm"
+                  placeholder="Ej. Juan Pérez"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-2">Hora Entrada</label>
+                  <input 
+                    type="time" 
+                    required
+                    value={editEmpEntrada}
+                    onChange={e => setEditEmpEntrada(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#1e293b] border border-[#334155] focus:outline-none focus:border-indigo-500 text-sm text-slate-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-2">Hora Salida</label>
+                  <input 
+                    type="time" 
+                    required
+                    value={editEmpSalida}
+                    onChange={e => setEditEmpSalida(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#1e293b] border border-[#334155] focus:outline-none focus:border-indigo-500 text-sm text-slate-300"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end pt-4">
+                <button 
+                  type="button"
+                  onClick={() => setEditingEmp(null)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:bg-[#1e293b] transition-colors text-sm font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors text-sm font-bold shadow-lg shadow-indigo-600/15"
+                >
+                  Actualizar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDITAR PUNTO ASISTENCIA */}
+      {editingPunto && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-md bg-[#0f172a] rounded-3xl border border-[#1e293b] p-8 shadow-2xl">
+            <h3 className="text-xl font-bold mb-6">Editar Punto de Asistencia</h3>
+            <form onSubmit={handleUpdatePunto} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-2">Nombre de la Sucursal/Oficina</label>
+                <input 
+                  type="text" 
+                  required
+                  value={editPuntoNombre}
+                  onChange={e => setEditPuntoNombre(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#1e293b] border border-[#334155] focus:outline-none focus:border-indigo-500 text-sm"
+                  placeholder="Ej. Oficina Central - Recepción"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-2">Latitud</label>
+                  <input 
+                    type="number" 
+                    step="any"
+                    required
+                    value={editPuntoLat}
+                    onChange={e => setEditPuntoLat(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#1e293b] border border-[#334155] focus:outline-none focus:border-indigo-500 text-sm font-mono"
+                    placeholder="Ej. 19.4326"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-2">Longitud</label>
+                  <input 
+                    type="number" 
+                    step="any"
+                    required
+                    value={editPuntoLng}
+                    onChange={e => setEditPuntoLng(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#1e293b] border border-[#334155] focus:outline-none focus:border-indigo-500 text-sm font-mono"
+                    placeholder="Ej. -99.1332"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-2">Radio de Tolerancia (metros)</label>
+                <input 
+                  type="number" 
+                  required
+                  value={editPuntoRadio}
+                  onChange={e => setEditPuntoRadio(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#1e293b] border border-[#334155] focus:outline-none focus:border-indigo-500 text-sm"
+                  placeholder="15"
+                />
+              </div>
+              <div className="flex gap-3 justify-end pt-4">
+                <button 
+                  type="button"
+                  onClick={() => setEditingPunto(null)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:bg-[#1e293b] transition-colors text-sm font-semibold"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors text-sm font-bold shadow-lg shadow-indigo-600/15"
+                >
+                  Actualizar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

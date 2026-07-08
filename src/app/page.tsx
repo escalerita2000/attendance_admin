@@ -176,8 +176,16 @@ export default function AdminDashboard() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setAuthError('Credenciales inválidas. Verifica tu correo y contraseña.');
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        console.error('Authentication Error:', error);
+        setAuthError(`Credenciales inválidas o error de conexión: ${error.message}`);
+      }
+    } catch (err: any) {
+      console.error('Connection Exception:', err);
+      setAuthError('Error de red o de conexión. Verifica tu conexión a internet.');
+    }
   };
 
   const handleLogout = async () => {
